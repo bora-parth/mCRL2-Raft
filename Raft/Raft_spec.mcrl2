@@ -27,8 +27,7 @@ eqn MAJORITY = Int2Pos(ceil(NumberOfServers/2));
 %%%%% Data Types %%%%%
 
 % possible states of a node
-% We added Crashed state which is an extra state in addition to the state in the paper
-sort State = struct Leader | Candidate | Follower | Crashed;
+sort State = struct Leader | Candidate | Follower ;
 
 % structure for different kinds of messages
 sort RPC = struct RequestVoteRequest(currentTermRPC: Nat, endLogIndex: Nat, endLogTerm: Nat)?isRequestVoteRequest | RequestVoteResponse(currentTermRPC: Nat, isVoteGranted: Bool)?isRequestVoteResponse | 
@@ -186,8 +185,8 @@ act sendRPC, receiveRPC, deliverRPC	: Payload;
 % actions for sending and receiving client requests
 act sendClientRequest, recvClientRequest, clientCommand;
 
-% action for timing out and crashing and resuming
-act timeout, crash, resume;
+% action for timing out
+act timeout;
 
 % action for advancing the commit index
 act advanceCommitIndex: Nat # Nat # Nat # LogType;
@@ -204,7 +203,7 @@ act exposeLogLeader: Nat # LogType;
 % Node process
 proc Node(id: Nat, currentState: State, currentTerm: Nat, log: LogType, commitIndex: Nat, 
 votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat), replyToBeSent: replyHelper) = 
-    (currentState != Crashed) -> (
+    (
         (!existMsg(replyToBeSent)) -> (sum msg: Payload . (receiverID(msg) == id) -> receiveRPC(msg) . (
             % drop stale message
             (currentTermRPC(rpc(msg)) < currentTerm) -> (
@@ -343,9 +342,6 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat),
                 )
             )
         )
-        +
-        % crash
-        crash . Node(currentState = Crashed)
         )
         +
         % handle reply which needs to be sent
@@ -376,10 +372,7 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat),
         % Followers can transition into a candidate states by timing out
         (((currentState == Follower) || (currentState == Candidate)) && (currentTerm < MaxTerm)) -> (
             timeout . Node(currentState = Candidate, currentTerm = currentTerm + 1, votedFor = Nat2Int(id), voterLog = [id])
-        )
-        +	
-        % anyone can crash	
-        crash . Node(currentState = Crashed)	
+        )	
         +
         % expose the leader (for property verification)
         (currentState == Leader) -> (
@@ -391,10 +384,6 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat),
         %% expose the log (for property verification)
         % exposeLog(id, currentTerm, commitIndex, log) . Node()        
     
-    )
-    <>	
-    (    % resume after crashing	
-          resume . Node (currentState = Follower, commitIndex = 0, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers), replyToBeSent = replyHelper(false, emptyMessage))	
     );
 
 % client process
@@ -402,7 +391,7 @@ proc Client(clientCommandID: Pos) =
      sum serverID: Nat . ((clientCommandID <= NumberOfClientRequests) -> sendClientRequest . Client(clientCommandID+1));
 
 % initial configuration
-init allow( {deliverRPC, clientCommand, advanceCommitIndex, timeout, exposeLeader, exposeLog, exposeLogLeader, crash, resume},
+init allow( {deliverRPC, clientCommand, advanceCommitIndex, timeout, exposeLeader, exposeLog, exposeLogLeader},
                comm (
                     {
                          sendClientRequest | recvClientRequest -> clientCommand,
