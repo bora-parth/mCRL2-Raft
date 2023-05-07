@@ -1,0 +1,13 @@
+<root>
+ <spec>AsyncNoCrash_spec.mcrl2</spec>
+ <properties>
+  <property>electionSafety</property>
+  <property>logMatching</property>
+  <property>leaderCompleteness</property>
+  <property>stateMachineSafety</property>
+  <property>electionSafetyLiveliness</property>
+  <property>leaderCompletenessLiveliness</property>
+  <property>logMatchingLiveliness</property>
+  <property>stateMachineLiveliness</property>
+ </properties>
+</root>

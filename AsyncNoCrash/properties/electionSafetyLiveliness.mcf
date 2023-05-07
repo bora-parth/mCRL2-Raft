@@ -1,0 +1,1 @@
+<true*> exists id1, term1: Nat . <exposeLeader(id1, term1)> true 

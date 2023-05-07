@@ -1,0 +1,1 @@
+[true*] forall currentCommitIndex, nextCommitIndex, term1: Nat,  log1: LogType . [advanceCommitIndex(currentCommitIndex, nextCommitIndex, term1, log1)] [true*] forall term2, index: Nat, log2: LogType . val(term2 > term1 && index > currentCommitIndex && index <= nextCommitIndex) => [exposeLogLeader(term2, log2)] val((log1 . index) in log2)

@@ -1,0 +1,1 @@
+<true*> exists id1, term1, commitIndex1: Nat, log1: LogType . val(commitIndex1 > 0) => <exposeLog(id1, term1, commitIndex1, log1)> <true*> exists id2, term2, commitIndex2: Nat, log2: LogType . val(id1 != id2 && commitIndex2 >= commitIndex1) => <exposeLog(id2, term2, commitIndex2, log2)> true
