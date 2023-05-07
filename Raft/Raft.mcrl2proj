@@ -1,5 +1,5 @@
 <root>
- <spec>AsyncNoCrash_spec.mcrl2</spec>
+ <spec>Raft_spec.mcrl2</spec>
  <properties>
   <property>electionSafety</property>
   <property>logMatching</property>
