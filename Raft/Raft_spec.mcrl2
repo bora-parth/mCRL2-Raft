@@ -231,8 +231,8 @@ act sendToNetworkSet, receiveFromServerSet, sendRPCset: List(NetworkPayload);
 % actions for sending and receiving client requests
 act sendClientRequest, recvClientRequest, clientCommand;
 
-% action for timing out
-act timeout;
+% action for timing out and crashing and resuming
+act timeout, crash, resume;
 
 % action for advancing the commit index
 act advanceCommitIndex: Nat # Nat # Nat # LogType;
@@ -388,7 +388,9 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat),
                 )
             )
         )
-
+        +
+        % crash
+        crash . Node(currentState = Crashed)
         )
         +
         % handle reply which needs to be sent
@@ -415,6 +417,9 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat),
         (((currentState == Follower) || (currentState == Candidate)) && (currentTerm < MaxTerm)) -> (
             timeout . Node(currentState = Candidate, currentTerm = currentTerm + 1, votedFor = Nat2Int(id), voterLog = [id])
         )
+        +	
+        % anyone can crash	
+        crash . Node(currentState = Crashed)	
         +
         % expose the leader (for property verification)
         (currentState == Leader) -> (
@@ -426,6 +431,10 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat),
         %% expose the log (for property verification)
         % exposeLog(id, currentTerm, commitIndex, log) . Node()        
     
+    )
+    <>	
+    (    % resume after crashing	
+          resume . Node (currentState = Follower, commitIndex = 0, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers), replyToBeSent = replyHelper(false, emptyMessage))	
     );
 
 % healthy and reliable network which doesn't loose messages
@@ -449,7 +458,7 @@ proc Client(clientCommandID: Pos) =
      sum serverID: Nat . ((clientCommandID <= NumberOfClientRequests) -> sendClientRequest . Client(clientCommandID+1));
 
 % initial configuration
-init allow( {sendRPC, receiveRPC, clientCommand, advanceCommitIndex, timeout, sendRPCset, exposeLeader, exposeLog, exposeLogLeader},
+init allow( {sendRPC, receiveRPC, clientCommand, advanceCommitIndex, timeout, sendRPCset, exposeLeader, exposeLog, exposeLogLeader, crash, resume},
                comm (
                     {
                          sendClientRequest | recvClientRequest -> clientCommand,
