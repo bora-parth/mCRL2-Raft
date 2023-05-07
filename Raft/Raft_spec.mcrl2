@@ -36,7 +36,7 @@ sort RPC = struct RequestVoteRequest(currentTermRPC: Nat, endLogIndex: Nat, endL
         AppendEntriesResponse(currentTermRPC: Nat, success: Bool, matchIndexRPC: Nat)?isAppendEntriesResponse;
 
 % structure for handling replies that need to be sent
-sort replyHelper = struct replyHelper(existMsg: Bool, reply: NetworkPayload);
+sort replyHelper = struct replyHelper(existMsg: Bool, reply: Payload);
 
 % entry (command) inside the log
 sort logEntry = struct Command(term: Nat);
@@ -45,7 +45,7 @@ sort logEntry = struct Command(term: Nat);
 sort LogType = List(logEntry);       
 
 % Network layer message
-sort NetworkPayload = struct Message(senderID: Nat, rpc: RPC, receiverID: Nat) | emptyMessage;
+sort Payload = struct Message(senderID: Nat, rpc: RPC, receiverID: Nat) | emptyMessage;
 
 %%%%%%% Functions (Equations) %%%%%%%
   
@@ -107,30 +107,16 @@ eqn
   replace(item'|>list, 0,item) = item |> list;
   (index > 0) -> replace(item'|>list, index,item) = item' |> replace(list,Int2Nat(index-1),item);
 
-% removes an element from a list
-map remove: List(NetworkPayload) # NetworkPayload -> List(NetworkPayload);  
-var list: List(NetworkPayload);
-    item: NetworkPayload;  
-eqn 
-    remove(list, item) = removeHelper(list, item, []);
-
-map removeHelper: List(NetworkPayload) # NetworkPayload # List(NetworkPayload) -> List(NetworkPayload);  
-var list, list': List(NetworkPayload);
-    item: NetworkPayload;  
-eqn 
-    (head(list) == item) -> removeHelper(list, item, list') = list' ++ tail(list);
-    !(head(list) == item) -> removeHelper(list, item, list') = removeHelper(tail(list), item, list' ++ [head(list)]);
-
 % add an element to a list if it isn't already in there. If it is, return the same list
-map add: List(NetworkPayload) # NetworkPayload -> List(NetworkPayload);
-var list: List(NetworkPayload);
-    item: NetworkPayload;
+map add: List(Payload) # Payload -> List(Payload);
+var list: List(Payload);
+    item: Payload;
 eqn (item in list) -> add(list, item) = list;
     (!(item in list)) -> add(list, item) = list <| item;
 
 % add an element to a list if it isn't already in there. If it is, return the same list
-map addList: List(NetworkPayload) # List(NetworkPayload) -> List(NetworkPayload);
-var list, listToAdd: List(NetworkPayload);
+map addList: List(Payload) # List(Payload) -> List(Payload);
+var list, listToAdd: List(Payload);
 eqn (# listToAdd == 0) -> addList(list, listToAdd) = list;
     (# listToAdd > 0) -> addList(list, listToAdd) = addList(add(list, head(listToAdd)), tail(listToAdd));
 
@@ -166,56 +152,28 @@ var num, numServers: Nat;
 eqn (numServers == 0) -> initArray(num, numServers) = [];
     (numServers != 0) -> initArray(num, numServers) = num |> initArray(num, Int2Nat(numServers - 1));  
 
-% returns a set of append entries messages
-% param 1: sender ID
-% param 2: nextIndex array
-% param 3: current term of the node
-% param 4: log
-% param 5: commit index of the leader
-map CreateAppendEntriesSet: Nat # List(Nat) # Nat # LogType # Nat -> List(NetworkPayload);
-var sender, termNode, commitIndex: Nat;
-    nextIndex: List(Nat);
-    log: LogType;
-eqn CreateAppendEntriesSet(sender, nextIndex, termNode, log, commitIndex) = CreateAppendEntriesSetHelper(sender, nextIndex, termNode, log, commitIndex, 0, []);
-    
-map CreateAppendEntriesSetHelper: Nat # List(Nat) # Nat # LogType # Nat # Nat # List(NetworkPayload) -> List(NetworkPayload);
-var sender, termNode, commitIndex, receiver: Nat;
-    nextIndex: List(Nat);
-    log: LogType;
-    msgSet: List(NetworkPayload);
-eqn (receiver == NumberOfServers) -> CreateAppendEntriesSetHelper(sender, nextIndex, termNode, log, commitIndex, receiver, msgSet) =  msgSet;
-    (receiver < NumberOfServers && receiver != sender) -> CreateAppendEntriesSetHelper(sender, nextIndex, termNode, log, commitIndex, receiver, msgSet) = CreateAppendEntriesSetHelper(sender, nextIndex, termNode, log, commitIndex, receiver + 1, msgSet ++ [CreateAppendEntriesMsg(sender, nextIndex, termNode, log, commitIndex, receiver)]);
-    (receiver < NumberOfServers && receiver == sender) -> CreateAppendEntriesSetHelper(sender, nextIndex, termNode, log, commitIndex, receiver, msgSet) = CreateAppendEntriesSetHelper(sender, nextIndex, termNode, log, commitIndex, receiver + 1, msgSet);
-
 % creates a single append entries message
-map CreateAppendEntriesMsg: Nat # List(Nat) # Nat # LogType # Nat # Nat -> NetworkPayload;
+% Param 1: sender id
+% Param 2: next Index array
+% Param 3: term of the node
+% Param 4: log
+% Param 5: commit index of the node
+% Param 6: receiver id
+map CreateAppendEntriesMsg: Nat # List(Nat) # Nat # LogType # Nat # Nat -> Payload;
 var sender, termNode, commitIndex, receiver: Nat;
     nextIndex: List(Nat);
     log: LogType;
 eqn (((nextIndex . receiver) - 1) > 0) -> CreateAppendEntriesMsg(sender, nextIndex, termNode, log, commitIndex, receiver) = Message(sender, AppendEntriesRequest(termNode, Int2Nat((nextIndex . receiver) - 1), getTerm(log, Int2Nat((nextIndex . receiver) - 1)), slice(log, Int2Nat((nextIndex . receiver) - 1), min(# log, ((nextIndex . receiver)))), min(min(commitIndex, # log), nextIndex . receiver)), receiver); 
     (((nextIndex . receiver) - 1) <= 0) -> CreateAppendEntriesMsg(sender, nextIndex, termNode, log, commitIndex, receiver) = Message(sender, AppendEntriesRequest(termNode, Int2Nat((nextIndex . receiver) - 1), 0, slice(log, Int2Nat((nextIndex . receiver) - 1), min(# log, ((nextIndex . receiver)))), min(min(commitIndex, # log), nextIndex . receiver)), receiver);
 
-% returns a set of request vote messages
-% param 1: sender ID
-% param 2: current term of node
-% param 3: length of the log
-% param 4: last term of the log
-% param 5: voter log of node
-map CreateRequestVoteSet: Nat # Nat # Nat # Nat # List(Nat) -> List(NetworkPayload);
-var sender, termNode, lengthLog, lastTermLog: Nat;
-    voterLog: List(Nat);
-eqn CreateRequestVoteSet(sender, termNode, lengthLog, lastTermLog, voterLog) = CreateRequestVoteSetHelper(sender, termNode, lengthLog, lastTermLog, voterLog, 0, []);
-
-map CreateRequestVoteSetHelper: Nat # Nat # Nat # Nat # List(Nat) # Nat # List(NetworkPayload) -> List(NetworkPayload);
-var sender, termNode, lengthLog, lastTermLog, receiver: Nat;
-    voterLog: List(Nat);
-    msgSet: List(NetworkPayload);
-eqn (receiver == NumberOfServers) -> CreateRequestVoteSetHelper(sender, termNode, lengthLog, lastTermLog, voterLog, receiver, msgSet) = msgSet;
-    (receiver < NumberOfServers && receiver != sender && !(receiver in voterLog)) ->  CreateRequestVoteSetHelper(sender, termNode, lengthLog, lastTermLog, voterLog, receiver, msgSet) = CreateRequestVoteSetHelper(sender, termNode, lengthLog, lastTermLog, voterLog, receiver + 1, msgSet ++ [CreateRequestVoteMsg(sender, termNode, lengthLog, lastTermLog, receiver)]);
-    (receiver < NumberOfServers && (receiver == sender || (receiver in voterLog))) -> CreateRequestVoteSetHelper(sender, termNode, lengthLog, lastTermLog, voterLog, receiver, msgSet) = CreateRequestVoteSetHelper(sender, termNode, lengthLog, lastTermLog, voterLog, receiver + 1, msgSet);
 
 % creates a single request vote message
-map CreateRequestVoteMsg: Nat # Nat # Nat # Nat # Nat -> NetworkPayload;
+% Param 1: sender id
+% Param 2: term of the node
+% Param 3: length of log
+% Param 4: term of the last entry in the log
+% Param 5: receiver id
+map CreateRequestVoteMsg: Nat # Nat # Nat # Nat # Nat -> Payload;
 var sender, termNode, lengthLog, lastTermLog, receiver: Nat;
 eqn CreateRequestVoteMsg(sender, termNode, lengthLog, lastTermLog, receiver) = Message(sender, RequestVoteRequest(termNode, lengthLog, lastTermLog), receiver);
 
@@ -223,10 +181,7 @@ eqn CreateRequestVoteMsg(sender, termNode, lengthLog, lastTermLog, receiver) = M
 %%%%%%%%%%%%%% Actions %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % actions for sending and receiving messages
-act sendToNetwork, receiveFromServer, sendToServer, receiveFromNetwork, sendRPC, receiveRPC: NetworkPayload;
-
-% actions for sending and receiving message sets
-act sendToNetworkSet, receiveFromServerSet, sendRPCset: List(NetworkPayload);
+act sendRPC, receiveRPC, deliverRPC	: Payload;
 
 % actions for sending and receiving client requests
 act sendClientRequest, recvClientRequest, clientCommand;
@@ -250,7 +205,7 @@ act exposeLogLeader: Nat # LogType;
 proc Node(id: Nat, currentState: State, currentTerm: Nat, log: LogType, commitIndex: Nat, 
 votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat), replyToBeSent: replyHelper) = 
     (currentState != Crashed) -> (
-        (!existMsg(replyToBeSent)) -> (sum msg: NetworkPayload . (receiverID(msg) == id) -> receiveFromNetwork(msg) . (
+        (!existMsg(replyToBeSent)) -> (sum msg: Payload . (receiverID(msg) == id) -> receiveRPC(msg) . (
             % drop stale message
             (currentTermRPC(rpc(msg)) < currentTerm) -> (
                 Node()
@@ -395,13 +350,16 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat),
         +
         % handle reply which needs to be sent
         (existMsg(replyToBeSent)) -> (
-            sendToNetwork(reply(replyToBeSent)) . Node (replyToBeSent = replyHelper(false, emptyMessage))
+            sendRPC(reply(replyToBeSent)) . Node (replyToBeSent = replyHelper(false, emptyMessage))
         )
         +
         % candidates can request votes
         ((currentState == Candidate) && !existMsg(replyToBeSent)) -> (
             % send request vote RPCs (only to people not in voterlog)
-            sendToNetworkSet(CreateRequestVoteSet(id, currentTerm, # log, lastTerm(log), voterLog)) . Node()
+            (sum receiver: Nat . ((receiver != id) && (receiver < NumberOfServers) && !(receiver in voterLog)) -> (
+                    sendRPC(CreateRequestVoteMsg(id, currentTerm, # log, lastTerm(log), receiver)) . Node()
+                ) 
+            )
         )
         +
         % leaders can receive client commands, send append entry requests 
@@ -410,7 +368,9 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat),
             recvClientRequest . Node(log = log <| Command(currentTerm))
             +
             % send append entry requests or heartbeats to servers
-            sendToNetworkSet(CreateAppendEntriesSet(id, nextIndex, currentTerm, log, commitIndex)) . Node()
+            (sum receiver: Nat . ((receiver != id) && (receiver < NumberOfServers)) -> (
+                sendRPC(CreateAppendEntriesMsg(id, nextIndex, currentTerm, log, commitIndex, receiver)) . Node()
+            ))
         )
         +
         % Followers can transition into a candidate states by timing out
@@ -437,39 +397,21 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat),
           resume . Node (currentState = Follower, commitIndex = 0, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers), replyToBeSent = replyHelper(false, emptyMessage))	
     );
 
-% healthy and reliable network which doesn't loose messages
-proc HealthyNetwork(messageCollection: List(NetworkPayload)) = 
-    % receive messages from server
-    (#messageCollection > 0) -> (
-        sum msg: NetworkPayload . (
-            (msg in messageCollection) -> (
-                sendToServer(msg) . HealthyNetwork(messageCollection = remove(messageCollection, msg))
-            )
-        )
-    ) 
-    <> ( % receive a single message
-    (# messageCollection < NetworkSize) -> sum msg: NetworkPayload . (receiveFromServer(msg) . HealthyNetwork(messageCollection = add(messageCollection, msg)))
-    + % receive a set of messages 
-    (# messageCollection < NetworkSize - (NumberOfServers - 1)) -> sum msgSet: List(NetworkPayload) . (receiveFromServerSet(msgSet) . HealthyNetwork(messageCollection = addList(messageCollection, msgSet)))
-    );
-
 % client process
 proc Client(clientCommandID: Pos) = 
      sum serverID: Nat . ((clientCommandID <= NumberOfClientRequests) -> sendClientRequest . Client(clientCommandID+1));
 
 % initial configuration
-init allow( {sendRPC, receiveRPC, clientCommand, advanceCommitIndex, timeout, sendRPCset, exposeLeader, exposeLog, exposeLogLeader, crash, resume},
+init allow( {deliverRPC, clientCommand, advanceCommitIndex, timeout, exposeLeader, exposeLog, exposeLogLeader, crash, resume},
                comm (
                     {
                          sendClientRequest | recvClientRequest -> clientCommand,
-                         sendToNetwork | receiveFromServer -> sendRPC, 
-                         sendToServer | receiveFromNetwork -> receiveRPC,
-                         sendToNetworkSet | receiveFromServerSet -> sendRPCset
+                         sendRPC | receiveRPC -> deliverRPC
                     },
                          Client(1) || Node(id = 0, currentState = Follower, currentTerm = 0, log = [], commitIndex = 0,
           votedFor = -1, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers), replyToBeSent = replyHelper(false, emptyMessage)) || Node(id = 1, currentState = Follower, currentTerm = 0, log = [], commitIndex = 0,
           votedFor = -1, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers), replyToBeSent = replyHelper(false, emptyMessage)) || Node(id = 2, currentState = Follower, currentTerm = 0, log = [], commitIndex = 0,
-          votedFor = -1, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers), replyToBeSent = replyHelper(false, emptyMessage)) || HealthyNetwork(messageCollection = [])
+          votedFor = -1, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers), replyToBeSent = replyHelper(false, emptyMessage))
                     )
 
 );
