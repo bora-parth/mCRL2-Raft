@@ -12,10 +12,6 @@ eqn NumberOfClientRequests = 2;
 map MaxTerm: Pos;
 eqn MaxTerm = 2;
 
-% no. of messages the server can hold
-map NetworkSize: Pos;
-eqn NetworkSize = 3;
-
 map BATCH_SIZE: Pos;
 eqn BATCH_SIZE = 1; 
 
