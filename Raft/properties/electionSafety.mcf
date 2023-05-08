@@ -1,1 +1,1 @@
-forall id1:Nat, id2:Nat, termx:Nat . val(id1 < 3 && id2 < 3 && id1 != id2 && termx <=1)  => [true* . exposeLeader(id1, termx)][true* . exposeLeader(id2, termx)]false
+forall id1:Nat, id2:Nat, termx:Nat . val(id1 < 3 && id2 < 3 && id1 != id2 && termx <=2)  => [true* . exposeLeader(id1, termx)][true* . exposeLeader(id2, termx)]false
