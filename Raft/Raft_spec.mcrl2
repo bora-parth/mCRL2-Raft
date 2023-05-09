@@ -428,21 +428,33 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat),
     
     );
 
-% healthy and reliable network which doesn't loose messages
-proc HealthyNetwork(messageCollection: List(NetworkPayload)) = 
-    % receive messages from server
+% proc lossy network 
+proc LossyDuplicateNetwork(messageCollection: List(NetworkPayload)) = 
+    % send message to other node
     (#messageCollection > 0) -> (
         sum msg: NetworkPayload . (
+            % send the message, then we remove it from the collection. 
             (msg in messageCollection) -> (
-                sendToServer(msg) . HealthyNetwork(messageCollection = remove(messageCollection, msg))
+                sendToServer(msg) . LossyDuplicateNetwork(messageCollection = remove(messageCollection, msg))
+            )
+            + 
+            % We model message duplication here by not removing the message from the collection after sending it
+            (msg in messageCollection) -> (
+                sendToServer(msg) . LossyDuplicateNetwork()
             )
         )
-    ) 
-    <> ( % receive a single message
-    (# messageCollection < NetworkSize) -> sum msg: NetworkPayload . (receiveFromServer(msg) . HealthyNetwork(messageCollection = add(messageCollection, msg)))
-    + % receive a set of messages 
-    (# messageCollection < NetworkSize - (NumberOfServers - 1)) -> sum msgSet: List(NetworkPayload) . (receiveFromServerSet(msgSet) . HealthyNetwork(messageCollection = addList(messageCollection, msgSet)))
-    );
+    ) <> 
+    % Receive message from server with a single message 
+    (# messageCollection < NetworkSize) -> sum msg: NetworkPayload . (receiveFromServer(msg) . LossyDuplicateNetwork(messageCollection = add(messageCollection, msg)))
+    +
+    % Model message loss of single message
+    (# messageCollection < NetworkSize) -> sum msg: NetworkPayload . (receiveFromServer(msg) . LossyDuplicateNetwork())
+    +
+    % Receive message from server as a pack of message. 
+    (# messageCollection < NetworkSize - (NumberOfServers - 1)) -> sum msgSet: List(NetworkPayload) . (receiveFromServerSet(msgSet) . LossyDuplicateNetwork(messageCollection = addList(messageCollection, msgSet)))
+    + 
+    % Model message loss of a pack of message
+    (# messageCollection < NetworkSize - (NumberOfServers - 1)) -> sum msgSet: List(NetworkPayload) . (receiveFromServerSet(msgSet) . LossyDuplicateNetwork());
 
 % client process
 proc Client(clientCommandID: Pos) = 
@@ -460,7 +472,7 @@ init allow( {sendRPC, receiveRPC, clientCommand, advanceCommitIndex, timeout, se
                          Client(1) || Node(id = 0, currentState = Follower, currentTerm = 0, log = [], commitIndex = 0,
           votedFor = -1, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers), replyToBeSent = replyHelper(false, emptyMessage)) || Node(id = 1, currentState = Follower, currentTerm = 0, log = [], commitIndex = 0,
           votedFor = -1, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers), replyToBeSent = replyHelper(false, emptyMessage)) || Node(id = 2, currentState = Follower, currentTerm = 0, log = [], commitIndex = 0,
-          votedFor = -1, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers), replyToBeSent = replyHelper(false, emptyMessage)) || HealthyNetwork(messageCollection = [])
+          votedFor = -1, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers), replyToBeSent = replyHelper(false, emptyMessage)) || LossyDuplicateNetwork(messageCollection = [])
                     )
 
 );
