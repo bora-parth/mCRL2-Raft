@@ -1,1 +1,1 @@
-[true*] forall id1:Nat, termx:Nat . [exposeLeader(id1, termx)] [true*] forall id2:Nat . val(id1 != id2) => [exposeLeader(id2, termx)]false
+[true*] forall id1:Nat, termx:Nat . [exposeLeader(id1, termx)] [true*] (forall id2:Nat . val(id1 != id2) => [exposeLeader(id2, termx)]false)
