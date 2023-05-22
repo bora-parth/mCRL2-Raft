@@ -260,9 +260,11 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat))
                     ((endLogTerm(rpc(msg)) > lastTerm(log)) || ((endLogTerm(rpc(msg)) == lastTerm(log) ) && (endLogIndex(rpc(msg)) >= #log))) -> (
                             % voted for is set to nil so we vote automatically
                             sendToNetwork(Message(id, RequestVoteResponse(currentTermRPC(rpc(msg)), true) , senderID(msg))) . Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = senderID(msg))
+                            + crash . Node(currentState = Crashed, currentTerm = currentTermRPC(rpc(msg)), votedFor = senderID(msg))
                     ) 
                     <>
                     sendToNetwork(Message(id, RequestVoteResponse(currentTermRPC(rpc(msg)), false) , senderID(msg))) . Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1)
+                    + crash . Node(currentState = Crashed, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1)
                 )
                 + 
                 (isAppendEntriesRequest(rpc(msg))) -> (
@@ -280,25 +282,30 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat))
                                 % conflict and entries missing
                                 (# slice(log, 0, prevLogIndex(rpc(msg))) == prevLogIndex(rpc(msg))) -> (
                                     sendToNetwork(Message(id, AppendEntriesResponse(currentTermRPC(rpc(msg)), true, prevLogIndex(rpc(msg)) + 1), senderID(msg))) . Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1, log = slice(log, 0, prevLogIndex(rpc(msg))) ++ entries(rpc(msg)), commitIndex = leaderCommit(rpc(msg)))
+                                    + crash . Node(currentState = Crashed, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1, log = slice(log, 0, prevLogIndex(rpc(msg))) ++ entries(rpc(msg)), commitIndex = leaderCommit(rpc(msg)))
                                 )
                                 <>
                                 % conflict and no entries missing
                                 sendToNetwork(Message(id, AppendEntriesResponse(currentTermRPC(rpc(msg)), true, prevLogIndex(rpc(msg)) + 1), senderID(msg))) . Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1, log = slice(log, 0, prevLogIndex(rpc(msg))), commitIndex = leaderCommit(rpc(msg)))
+                                + crash . Node(currentState = Crashed, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1, log = slice(log, 0, prevLogIndex(rpc(msg))), commitIndex = leaderCommit(rpc(msg)))
                             )
                             <>
                             (   % no conflict and entry missing
                                 (# log == prevLogIndex(rpc(msg))) -> (
                                     sendToNetwork(Message(id, AppendEntriesResponse(currentTermRPC(rpc(msg)), true, prevLogIndex(rpc(msg)) + 1), senderID(msg))) . Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1, log = log ++ entries(rpc(msg)), commitIndex = leaderCommit(rpc(msg)))
+                                    + crash . Node(currentState = Crashed, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1, log = log ++ entries(rpc(msg)), commitIndex = leaderCommit(rpc(msg)))
                                 )
                                 <>
                                 % no conflict and no entry missing
                                 sendToNetwork(Message(id, AppendEntriesResponse(currentTermRPC(rpc(msg)), true, prevLogIndex(rpc(msg)) + 1), senderID(msg))) . Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1, commitIndex = leaderCommit(rpc(msg)))
+                                + crash . Node(currentState = Crashed, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1, commitIndex = leaderCommit(rpc(msg)))
                             )
                         )
 
                     )
                     <> % log is not okay
                     sendToNetwork(Message(id, AppendEntriesResponse(currentTermRPC(rpc(msg)), false, 0), senderID(msg))) . Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1)
+                    + crash . Node(currentState = Crashed, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1)
                 )
             )
             +
@@ -309,10 +316,12 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat))
                     ((endLogTerm(rpc(msg)) > lastTerm(log)) || ((endLogTerm(rpc(msg)) == lastTerm(log) ) && (endLogIndex(rpc(msg)) >= #log)) && (votedFor == senderID(msg) || votedFor == -1)) -> (
                         %vote for the sender if log is okay
                         sendToNetwork(Message(id, RequestVoteResponse(currentTerm, true) , senderID(msg))) . Node(votedFor = senderID(msg))
+                        + crash . Node(votedFor = senderID(msg))
                     ) 
                     <>
                     % don't vote if log is not okay or we've voted for someone else
                     sendToNetwork(Message(id, RequestVoteResponse(currentTerm, false) , senderID(msg))) . Node()
+                    + crash . Node()
                 )
                 +
                 (isRequestVoteResponse(rpc(msg))) -> (
@@ -336,6 +345,8 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat))
                         % heartbeat message
                         ((# entries(rpc(msg)) == 0)) -> sendToNetwork(Message(id, AppendEntriesResponse(currentTerm, true, prevLogIndex(rpc(msg))), senderID(msg))) . Node(currentState = Follower, commitIndex = leaderCommit(rpc(msg)))
                         +
+                        crash . Node(currentState = Crashed, commitIndex = leaderCommit(rpc(msg)))
+                        + 
                         % normal append entry message
                         (# entries(rpc(msg)) > 0) -> (
                             % check for conflict with leader
@@ -345,25 +356,30 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat))
                                 % conflict and entries missing
                                 (# slice(log, 0, prevLogIndex(rpc(msg))) == prevLogIndex(rpc(msg))) -> (
                                     sendToNetwork(Message(id, AppendEntriesResponse(currentTerm, true, prevLogIndex(rpc(msg)) + 1), senderID(msg))) . Node(currentState = Follower, log = slice(log, 0, prevLogIndex(rpc(msg))) ++ entries(rpc(msg)), commitIndex = leaderCommit(rpc(msg)))
+                                    + crash . Node(currentState = Crashed, log = slice(log, 0, prevLogIndex(rpc(msg))) ++ entries(rpc(msg)), commitIndex = leaderCommit(rpc(msg)))
                                 )
                                 <>
                                 % conflict and no entries missing
                                 sendToNetwork(Message(id, AppendEntriesResponse(currentTerm, true, prevLogIndex(rpc(msg)) + 1), senderID(msg))) . Node(currentState = Follower, log = slice(log, 0, prevLogIndex(rpc(msg))), commitIndex = leaderCommit(rpc(msg)))
+                                + crash . Node(currentState = Crashed, log = slice(log, 0, prevLogIndex(rpc(msg))), commitIndex = leaderCommit(rpc(msg)))
                             )
                             <>
                             (   % no conflict and entry missing
                                 (# log == prevLogIndex(rpc(msg))) -> (
                                     sendToNetwork(Message(id, AppendEntriesResponse(currentTerm, true, prevLogIndex(rpc(msg)) + 1), senderID(msg))) . Node(currentState = Follower, log = log ++ entries(rpc(msg)), commitIndex = leaderCommit(rpc(msg)))
+                                    + crash . Node(currentState = Crashed, log = log ++ entries(rpc(msg)), commitIndex = leaderCommit(rpc(msg)))
                                 )
                                 <>
                                 % no conflict and no entry missing
                                 sendToNetwork(Message(id, AppendEntriesResponse(currentTerm, true, prevLogIndex(rpc(msg)) + 1), senderID(msg))) . Node(currentState = Follower, commitIndex = leaderCommit(rpc(msg)))
+                                + crash . Node(currentState = Crashed, commitIndex = leaderCommit(rpc(msg)))
                             )
                         )
 
                     )
                     <> % log is not okay
                     sendToNetwork(Message(id, AppendEntriesResponse(currentTerm, false, 0), senderID(msg))) . Node(currentState = Follower)
+                    + crash . Node(currentState = Crashed)
                 )
                 +
                 ((isAppendEntriesResponse(rpc(msg)))) -> (
