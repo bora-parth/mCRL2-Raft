@@ -35,9 +35,6 @@ sort RPC = struct RequestVoteRequest(currentTermRPC: Nat, endLogIndex: Nat, endL
         AppendEntriesRequest(currentTermRPC: Nat, prevLogIndex: Nat, prevLogTerm: Nat, entries: LogType, leaderCommit: Nat)?isAppendEntriesRequest | 
         AppendEntriesResponse(currentTermRPC: Nat, success: Bool, matchIndexRPC: Nat)?isAppendEntriesResponse;
 
-% structure for handling replies that need to be sent
-sort replyHelper = struct replyHelper(existMsg: Bool, reply: NetworkPayload);
-
 % entry (command) inside the log
 sort logEntry = struct Command(term: Nat);
 
@@ -248,9 +245,9 @@ act exposeLogLeader: Nat # LogType;
 
 % Node process
 proc Node(id: Nat, currentState: State, currentTerm: Nat, log: LogType, commitIndex: Nat, 
-votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat), replyToBeSent: replyHelper) = 
+votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat)) = 
     (currentState != Crashed) -> (
-        (!existMsg(replyToBeSent)) -> (sum msg: NetworkPayload . (receiverID(msg) == id) -> receiveFromNetwork(msg) . (
+        (sum msg: NetworkPayload . (receiverID(msg) == id) -> receiveFromNetwork(msg) . (
             % drop stale message
             (currentTermRPC(rpc(msg)) < currentTerm) -> (
                 Node()
@@ -262,17 +259,17 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat),
                 -> (% If the last log term in the request message is greater than that of the current note or it it is equal, we need to compare the length of the log to decide what to send  
                     ((endLogTerm(rpc(msg)) > lastTerm(log)) || ((endLogTerm(rpc(msg)) == lastTerm(log) ) && (endLogIndex(rpc(msg)) >= #log))) -> (
                             % voted for is set to nil so we vote automatically
-                            Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = senderID(msg), replyToBeSent = replyHelper(true, Message(id, RequestVoteResponse(currentTermRPC(rpc(msg)), true) , senderID(msg))))
+                            sendToNetwork(Message(id, RequestVoteResponse(currentTermRPC(rpc(msg)), true) , senderID(msg))) . Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = senderID(msg))
                     ) 
                     <>
-                    Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1, replyToBeSent = replyHelper(true, Message(id, RequestVoteResponse(currentTermRPC(rpc(msg)), false) , senderID(msg))))
+                    sendToNetwork(Message(id, RequestVoteResponse(currentTermRPC(rpc(msg)), false) , senderID(msg))) . Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1)
                 )
                 + 
                 (isAppendEntriesRequest(rpc(msg))) -> (
                     % check if log is ok
                     ((prevLogIndex(rpc(msg)) == 0) || ((prevLogIndex(rpc(msg)) > 0) && (prevLogIndex(rpc(msg)) <= # log) && (prevLogTerm(rpc(msg)) == (getTerm(log, prevLogIndex(rpc(msg))))))) -> (
                         % heartbeat message
-                        ((# entries(rpc(msg)) == 0)) -> Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1, commitIndex = leaderCommit(rpc(msg)), replyToBeSent = replyHelper(true, Message(id, AppendEntriesResponse(currentTermRPC(rpc(msg)), true, prevLogIndex(rpc(msg))), senderID(msg))))
+                        ((# entries(rpc(msg)) == 0)) -> sendToNetwork(Message(id, AppendEntriesResponse(currentTermRPC(rpc(msg)), true, prevLogIndex(rpc(msg))), senderID(msg))) . Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1, commitIndex = leaderCommit(rpc(msg)))
                         +
                         % normal append entry message
                         (# entries(rpc(msg)) > 0) -> (
@@ -282,26 +279,26 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat),
                                 % append entry in the log if it is missing
                                 % conflict and entries missing
                                 (# slice(log, 0, prevLogIndex(rpc(msg))) == prevLogIndex(rpc(msg))) -> (
-                                    Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1, log = slice(log, 0, prevLogIndex(rpc(msg))) ++ entries(rpc(msg)), commitIndex = leaderCommit(rpc(msg)), replyToBeSent = replyHelper(true, Message(id, AppendEntriesResponse(currentTermRPC(rpc(msg)), true, prevLogIndex(rpc(msg)) + 1), senderID(msg))))
+                                    sendToNetwork(Message(id, AppendEntriesResponse(currentTermRPC(rpc(msg)), true, prevLogIndex(rpc(msg)) + 1), senderID(msg))) . Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1, log = slice(log, 0, prevLogIndex(rpc(msg))) ++ entries(rpc(msg)), commitIndex = leaderCommit(rpc(msg)))
                                 )
                                 <>
                                 % conflict and no entries missing
-                                Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1, log = slice(log, 0, prevLogIndex(rpc(msg))), commitIndex = leaderCommit(rpc(msg)), replyToBeSent = replyHelper(true, Message(id, AppendEntriesResponse(currentTermRPC(rpc(msg)), true, prevLogIndex(rpc(msg)) + 1), senderID(msg))))
+                                sendToNetwork(Message(id, AppendEntriesResponse(currentTermRPC(rpc(msg)), true, prevLogIndex(rpc(msg)) + 1), senderID(msg))) . Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1, log = slice(log, 0, prevLogIndex(rpc(msg))), commitIndex = leaderCommit(rpc(msg)))
                             )
                             <>
                             (   % no conflict and entry missing
                                 (# log == prevLogIndex(rpc(msg))) -> (
-                                    Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1, log = log ++ entries(rpc(msg)), commitIndex = leaderCommit(rpc(msg)), replyToBeSent = replyHelper(true, Message(id, AppendEntriesResponse(currentTermRPC(rpc(msg)), true, prevLogIndex(rpc(msg)) + 1), senderID(msg))))
+                                    sendToNetwork(Message(id, AppendEntriesResponse(currentTermRPC(rpc(msg)), true, prevLogIndex(rpc(msg)) + 1), senderID(msg))) . Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1, log = log ++ entries(rpc(msg)), commitIndex = leaderCommit(rpc(msg)))
                                 )
                                 <>
                                 % no conflict and no entry missing
-                                Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1, commitIndex = leaderCommit(rpc(msg)), replyToBeSent = replyHelper(true, Message(id, AppendEntriesResponse(currentTermRPC(rpc(msg)), true, prevLogIndex(rpc(msg)) + 1), senderID(msg))))
+                                sendToNetwork(Message(id, AppendEntriesResponse(currentTermRPC(rpc(msg)), true, prevLogIndex(rpc(msg)) + 1), senderID(msg))) . Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1, commitIndex = leaderCommit(rpc(msg)))
                             )
                         )
 
                     )
                     <> % log is not okay
-                    Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1, replyToBeSent = replyHelper(true, Message(id, AppendEntriesResponse(currentTermRPC(rpc(msg)), false, 0), senderID(msg))))
+                    sendToNetwork(Message(id, AppendEntriesResponse(currentTermRPC(rpc(msg)), false, 0), senderID(msg))) . Node(currentState = Follower, currentTerm = currentTermRPC(rpc(msg)), votedFor = -1)
                 )
             )
             +
@@ -311,11 +308,11 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat),
                 -> (% If the last log term in the request message is greater than that of the current note or it it is equal, we need to compare the length of the log to decide what to send  
                     ((endLogTerm(rpc(msg)) > lastTerm(log)) || ((endLogTerm(rpc(msg)) == lastTerm(log) ) && (endLogIndex(rpc(msg)) >= #log)) && (votedFor == senderID(msg) || votedFor == -1)) -> (
                         %vote for the sender if log is okay
-                        Node(votedFor = senderID(msg), replyToBeSent = replyHelper(true, Message(id, RequestVoteResponse(currentTerm, true) , senderID(msg))))
+                        sendToNetwork(Message(id, RequestVoteResponse(currentTerm, true) , senderID(msg))) . Node(votedFor = senderID(msg))
                     ) 
                     <>
                     % don't vote if log is not okay or we've voted for someone else
-                    Node(replyToBeSent = replyHelper(true, Message(id, RequestVoteResponse(currentTerm, false) , senderID(msg))))
+                    sendToNetwork(Message(id, RequestVoteResponse(currentTerm, false) , senderID(msg))) . Node()
                 )
                 +
                 (isRequestVoteResponse(rpc(msg))) -> (
@@ -337,7 +334,7 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat),
                     % check if log is ok
                     ((prevLogIndex(rpc(msg)) == 0) || ((prevLogIndex(rpc(msg)) > 0) && (prevLogIndex(rpc(msg)) <= # log) && (prevLogTerm(rpc(msg)) == (getTerm(log, prevLogIndex(rpc(msg))))))) -> (
                         % heartbeat message
-                        ((# entries(rpc(msg)) == 0)) -> Node(currentState = Follower, commitIndex = leaderCommit(rpc(msg)), replyToBeSent = replyHelper(true, Message(id, AppendEntriesResponse(currentTerm, true, prevLogIndex(rpc(msg))), senderID(msg))))
+                        ((# entries(rpc(msg)) == 0)) -> sendToNetwork(Message(id, AppendEntriesResponse(currentTerm, true, prevLogIndex(rpc(msg))), senderID(msg))) . Node(currentState = Follower, commitIndex = leaderCommit(rpc(msg)))
                         +
                         % normal append entry message
                         (# entries(rpc(msg)) > 0) -> (
@@ -347,26 +344,26 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat),
                                 % append entry in the log if it is missing
                                 % conflict and entries missing
                                 (# slice(log, 0, prevLogIndex(rpc(msg))) == prevLogIndex(rpc(msg))) -> (
-                                    Node(currentState = Follower, log = slice(log, 0, prevLogIndex(rpc(msg))) ++ entries(rpc(msg)), commitIndex = leaderCommit(rpc(msg)), replyToBeSent = replyHelper(true, Message(id, AppendEntriesResponse(currentTerm, true, prevLogIndex(rpc(msg)) + 1), senderID(msg))))
+                                    sendToNetwork(Message(id, AppendEntriesResponse(currentTerm, true, prevLogIndex(rpc(msg)) + 1), senderID(msg))) . Node(currentState = Follower, log = slice(log, 0, prevLogIndex(rpc(msg))) ++ entries(rpc(msg)), commitIndex = leaderCommit(rpc(msg)))
                                 )
                                 <>
                                 % conflict and no entries missing
-                                Node(currentState = Follower, log = slice(log, 0, prevLogIndex(rpc(msg))), commitIndex = leaderCommit(rpc(msg)), replyToBeSent = replyHelper(true, Message(id, AppendEntriesResponse(currentTerm, true, prevLogIndex(rpc(msg)) + 1), senderID(msg))))
+                                sendToNetwork(Message(id, AppendEntriesResponse(currentTerm, true, prevLogIndex(rpc(msg)) + 1), senderID(msg))) . Node(currentState = Follower, log = slice(log, 0, prevLogIndex(rpc(msg))), commitIndex = leaderCommit(rpc(msg)))
                             )
                             <>
                             (   % no conflict and entry missing
                                 (# log == prevLogIndex(rpc(msg))) -> (
-                                    Node(currentState = Follower, log = log ++ entries(rpc(msg)), commitIndex = leaderCommit(rpc(msg)), replyToBeSent = replyHelper(true, Message(id, AppendEntriesResponse(currentTerm, true, prevLogIndex(rpc(msg)) + 1), senderID(msg))))
+                                    sendToNetwork(Message(id, AppendEntriesResponse(currentTerm, true, prevLogIndex(rpc(msg)) + 1), senderID(msg))) . Node(currentState = Follower, log = log ++ entries(rpc(msg)), commitIndex = leaderCommit(rpc(msg)))
                                 )
                                 <>
                                 % no conflict and no entry missing
-                                Node(currentState = Follower, commitIndex = leaderCommit(rpc(msg)), replyToBeSent = replyHelper(true, Message(id, AppendEntriesResponse(currentTerm, true, prevLogIndex(rpc(msg)) + 1), senderID(msg))))
+                                sendToNetwork(Message(id, AppendEntriesResponse(currentTerm, true, prevLogIndex(rpc(msg)) + 1), senderID(msg))) . Node(currentState = Follower, commitIndex = leaderCommit(rpc(msg)))
                             )
                         )
 
                     )
                     <> % log is not okay
-                    Node(currentState = Follower, replyToBeSent = replyHelper(true, Message(id, AppendEntriesResponse(currentTerm, false, 0), senderID(msg))))
+                    sendToNetwork(Message(id, AppendEntriesResponse(currentTerm, false, 0), senderID(msg))) . Node(currentState = Follower)
                 )
                 +
                 ((isAppendEntriesResponse(rpc(msg)))) -> (
@@ -393,19 +390,14 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat),
         crash . Node(currentState = Crashed)
         )
         +
-        % handle reply which needs to be sent
-        (existMsg(replyToBeSent)) -> (
-            sendToNetwork(reply(replyToBeSent)) . Node (replyToBeSent = replyHelper(false, emptyMessage))
-        )
-        +
         % candidates can request votes
-        ((currentState == Candidate) && !existMsg(replyToBeSent)) -> (
+        (currentState == Candidate) -> (
             % send request vote RPCs (only to people not in voterlog)
             sendToNetworkSet(CreateRequestVoteSet(id, currentTerm, # log, lastTerm(log), voterLog)) . Node()
         )
         +
         % leaders can receive client commands, send append entry requests 
-        ((currentState == Leader) && !existMsg(replyToBeSent)) -> (
+        (currentState == Leader) -> (
             % receive messages from clients
             recvClientRequest . Node(log = log <| Command(currentTerm))
             +
@@ -434,7 +426,7 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat),
     )
     <>	
     (    % resume after crashing	
-          resume . Node (currentState = Follower, commitIndex = 0, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers), replyToBeSent = replyHelper(false, emptyMessage))	
+          resume . Node (currentState = Follower, commitIndex = 0, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers))	
     );
 
 % healthy and reliable network which doesn't loose messages
@@ -467,9 +459,9 @@ init allow( {sendRPC, receiveRPC, clientCommand, advanceCommitIndex, timeout, se
                          sendToNetworkSet | receiveFromServerSet -> sendRPCset
                     },
                          Client(1) || Node(id = 0, currentState = Follower, currentTerm = 0, log = [], commitIndex = 0,
-          votedFor = -1, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers), replyToBeSent = replyHelper(false, emptyMessage)) || Node(id = 1, currentState = Follower, currentTerm = 0, log = [], commitIndex = 0,
-          votedFor = -1, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers), replyToBeSent = replyHelper(false, emptyMessage)) || Node(id = 2, currentState = Follower, currentTerm = 0, log = [], commitIndex = 0,
-          votedFor = -1, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers), replyToBeSent = replyHelper(false, emptyMessage)) || HealthyNetwork(messageCollection = [])
+          votedFor = -1, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers)) || Node(id = 1, currentState = Follower, currentTerm = 0, log = [], commitIndex = 0,
+          votedFor = -1, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers)) || Node(id = 2, currentState = Follower, currentTerm = 0, log = [], commitIndex = 0,
+          votedFor = -1, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers)) || HealthyNetwork(messageCollection = [])
                     )
 
 );
