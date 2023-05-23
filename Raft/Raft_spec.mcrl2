@@ -10,7 +10,7 @@ eqn NumberOfClientRequests = 2;
 
 %max no. of terms
 map MaxTerm: Pos;
-eqn MaxTerm = 2;
+eqn MaxTerm = 1;
 
 % no. of messages the server can hold
 map NetworkSize: Pos;
@@ -415,16 +415,16 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat),
         (((currentState == Follower) || (currentState == Candidate)) && (currentTerm < MaxTerm)) -> (
             timeout . Node(currentState = Candidate, currentTerm = currentTerm + 1, votedFor = Nat2Int(id), voterLog = [id])
         )
-        +
-        % expose the leader (for property verification)
-        (currentState == Leader) -> (
-            exposeLeader(id, currentTerm) . Node()
-            % +
-            %exposeLogLeader(currentTerm, log) . Node()
-        )
         % +
-        %% expose the log (for property verification)
-        % exposeLog(id, currentTerm, commitIndex, log) . Node()        
+        % % expose the leader (for property verification)
+        % (currentState == Leader) -> (
+        %     exposeLeader(id, currentTerm) . Node()
+        %     % +
+        %     %exposeLogLeader(currentTerm, log) . Node()
+        % )
+        +
+        % expose the log (for property verification)
+        exposeLog(id, currentTerm, commitIndex, log) . Node()        
     
     );
 
