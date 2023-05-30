@@ -6,11 +6,11 @@ eqn NumberOfServers = 3;
 
 % max no. of client requests
 map NumberOfClientRequests: Pos;
-eqn NumberOfClientRequests = 2;
+eqn NumberOfClientRequests = 1;
 
 %max no. of terms
 map MaxTerm: Pos;
-eqn MaxTerm = 2;
+eqn MaxTerm = 1;
 
 % no. of messages the server can hold
 map NetworkSize: Pos;
@@ -385,9 +385,6 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat))
                 )
             )
         )
-        +
-        % crash
-        crash . Node(currentState = Crashed)
         )
         +
         % candidates can request votes
@@ -408,10 +405,7 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat))
         % Followers can transition into a candidate states by timing out
         (((currentState == Follower) || (currentState == Candidate)) && (currentTerm < MaxTerm)) -> (
             timeout . Node(currentState = Candidate, currentTerm = currentTerm + 1, votedFor = Nat2Int(id), voterLog = [id])
-        )
-        +	
-        % anyone can crash	
-        crash . Node(currentState = Crashed)	
+        )	
         +
         % expose the leader (for property verification)
         (currentState == Leader) -> (
