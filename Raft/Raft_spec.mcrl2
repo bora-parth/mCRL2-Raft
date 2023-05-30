@@ -413,7 +413,7 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat),
         +
         % Followers can transition into a candidate states by timing out
         (((currentState == Follower) || (currentState == Candidate)) && (currentTerm < MaxTerm)) -> (
-            timeout . Node(currentState = Candidate, currentTerm = currentTerm + 1, votedFor = Nat2Int(id), voterLog = [id])
+            timeout . Node(currentState = Candidate, currentTerm = currentTerm + 1, votedFor = Nat2Int(id), voterLog = [id], replyToBeSent = replyHelper(false, emptyMessage))
         )
         % +
         % % expose the leader (for property verification)
@@ -430,19 +430,16 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat),
 
 % healthy and reliable network which doesn't loose messages
 proc HealthyNetwork(messageCollection: List(NetworkPayload)) = 
-    % receive messages from server
-    (#messageCollection > 0) -> (
-        sum msg: NetworkPayload . (
-            (msg in messageCollection) -> (
-                sendToServer(msg) . HealthyNetwork(messageCollection = remove(messageCollection, msg))
-            )
-        )
-    ) 
-    <> ( % receive a single message
-    (# messageCollection < NetworkSize) -> sum msg: NetworkPayload . (receiveFromServer(msg) . HealthyNetwork(messageCollection = add(messageCollection, msg)))
-    + % receive a set of messages 
-    (# messageCollection < NetworkSize - (NumberOfServers - 1)) -> sum msgSet: List(NetworkPayload) . (receiveFromServerSet(msgSet) . HealthyNetwork(messageCollection = addList(messageCollection, msgSet)))
-    );
+            % receive messages from server
+            (# messageCollection < NetworkSize) -> sum msg: NetworkPayload . (receiveFromServer(msg) . HealthyNetwork(messageCollection = add(messageCollection, msg)))
+            +
+            (# messageCollection < NetworkSize - (NumberOfServers - 1)) -> sum msgSet: List(NetworkPayload) . (receiveFromServerSet(msgSet) . HealthyNetwork(messageCollection = addList(messageCollection, msgSet)))
+            +
+            sum msg: NetworkPayload . (
+                (msg in messageCollection) -> (
+                    sendToServer(msg) . HealthyNetwork(messageCollection = remove(messageCollection, msg))
+                )
+            );
 
 % client process
 proc Client(clientCommandID: Pos) = 
