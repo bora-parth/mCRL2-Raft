@@ -439,19 +439,16 @@ votedFor: Int, voterLog: List(Nat), nextIndex: List(Nat), matchIndex: List(Nat),
 
 % healthy and reliable network which doesn't loose messages
 proc HealthyNetwork(messageCollection: List(NetworkPayload)) = 
-    % receive messages from server
-    (#messageCollection > 0) -> (
-        sum msg: NetworkPayload . (
-            (msg in messageCollection) -> (
-                sendToServer(msg) . HealthyNetwork(messageCollection = remove(messageCollection, msg))
-            )
-        )
-    ) 
-    <> ( % receive a single message
-    (# messageCollection < NetworkSize) -> sum msg: NetworkPayload . (receiveFromServer(msg) . HealthyNetwork(messageCollection = add(messageCollection, msg)))
-    + % receive a set of messages 
-    (# messageCollection < NetworkSize - (NumberOfServers - 1)) -> sum msgSet: List(NetworkPayload) . (receiveFromServerSet(msgSet) . HealthyNetwork(messageCollection = addList(messageCollection, msgSet)))
-    );
+            % receive messages from server
+            (# messageCollection < NetworkSize) -> sum msg: NetworkPayload . (receiveFromServer(msg) . HealthyNetwork(messageCollection = add(messageCollection, msg)))
+            +
+            (# messageCollection < NetworkSize - (NumberOfServers - 1)) -> sum msgSet: List(NetworkPayload) . (receiveFromServerSet(msgSet) . HealthyNetwork(messageCollection = addList(messageCollection, msgSet)))
+            +
+            sum msg: NetworkPayload . (
+                (msg in messageCollection) -> (
+                    sendToServer(msg) . HealthyNetwork(messageCollection = remove(messageCollection, msg))
+                )
+            );
 
 % client process
 proc Client(clientCommandID: Pos) = 
