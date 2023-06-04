@@ -1,0 +1,1 @@
+mu X . (([true] X) || ((<true*> exists id1: Nat . <exposeLeader(id1, 1)> true) => (<true*> <clientCommand> true)))
