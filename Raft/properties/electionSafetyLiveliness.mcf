@@ -1,1 +1,3 @@
-([true*] <true*> <timeout> true) && ([true* . timeout . !(timeout)*] <true*> exists id1, term1: Nat . <exposeLeader(id1, term1)> true)
+(mu X . (([true] X) || (<true*> <timeout> true))) && ([(!timeout)* . timeout . (!timeout)*] <true*> exists id1, term1: Nat . <exposeLeader(id1, term1)> true)
+
+
