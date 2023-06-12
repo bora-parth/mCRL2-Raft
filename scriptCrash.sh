@@ -5,7 +5,7 @@ files=("clientCommand.mcf"  "electionSafety.mcf" "electionSafetyLiveliness.mcf" 
 
 # Iterate over the files and create tmux sessions
 for file in "${files[@]}"; do
-    session_name="${file%.*}" # Extract the session name without the file extension
+    session_name="${file%.*}_crash" # Extract the session name without the file extension
     
     # Open a new tmux session and run the commands
     tmux new-session -d -s "$session_name"
