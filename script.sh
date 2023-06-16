@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the files
-files=("clientCommand.mcf"  "electionSafety.mcf" "electionSafetyLiveliness.mcf" "leaderCompleteness.mcf" "leaderCompletenessLiveliness.mcf" "logMatching.mcf" "logMatchingLiveliness.mcf" "stateMachineLiveliness.mcf" "stateMachineSafety.mcf")
+files=("clientCommand.mcf"  "electionSafety.mcf" "electionSafetyLiveliness.mcf" "leaderCompleteness.mcf" "leaderCompletenessLiveliness.mcf" "logMatching.mcf" "logMatchingLiveliness.mcf" "stateMachineLiveliness.mcf" "stateMachineSafety.mcf" "timeout.mcf")
 
 # Iterate over the files and create tmux sessions
 for file in "${files[@]}"; do
