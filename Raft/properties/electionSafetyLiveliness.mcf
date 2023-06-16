@@ -1,1 +1,5 @@
-<true*> exists id1, term1: Nat . <exposeLeader(id1, term1)> true 
+([(!timeout)* . timeout . (!timeout)*] <true*> exists id1, term1: Nat . <exposeLeader(id1, term1)> true) &&
+([(!timeout)* . timeout . (!timeout)* . timeout . (!timeout)*] <true*> exists id1, term1: Nat . <exposeLeader(id1, term1)> true)
+
+
+
