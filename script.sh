@@ -12,7 +12,7 @@ for file in "${files[@]}"; do
     tmux send-keys -t "$session_name" 'export PATH=/scratch/mCRL2/master/build/stage/bin/:$PATH' Enter
     tmux send-keys -t "$session_name" 'cd /scratch/20201025' Enter
     tmux send-keys -t "$session_name" "lps2pbes -v raft.lps -f $file raft_$session_name.pbes" Enter
-    tmux send-keys -t "$session_name" "pbessolvesymbolic --cached --chaining --groups=simple -v -m100 --threads=3 --timings=timing_$session_name.txt -rjittyc raft_$session_name.pbes" Enter
+    tmux send-keys -t "$session_name" "pbessolvesymbolic --cached --chaining --groups=simple -v -m100 --threads=4 --timings=timing_$session_name.txt -rjittyc raft_$session_name.pbes" Enter
 done
 
 # Attach to the first session
