@@ -580,7 +580,9 @@ proc Node(
                     % check if the request was successful
                     (success(rpc(msg))) -> (
                         % update nextIndex and matchIndex, advance commit index
-                        (((findMaxAgreeIndex(# log, replace(matchIndex, senderID(msg), matchIndexRPC(rpc(msg)))) > 0) && (getTerm(log, findMaxAgreeIndex(# log, replace(matchIndex, senderID(msg), matchIndexRPC(rpc(msg))))) == currentTerm) && (commitIndex != findMaxAgreeIndex(# log, replace(matchIndex, senderID(msg), matchIndexRPC(rpc(msg))))))) -> advanceCommitIndex(commitIndex, findMaxAgreeIndex(# log, matchIndex), currentTerm, log) . Node(nextIndex = replace(nextIndex, senderID(msg), matchIndexRPC(rpc(msg))+1), matchIndex = replace(matchIndex, senderID(msg), matchIndexRPC(rpc(msg))), commitIndex = findMaxAgreeIndex(# log, replace(matchIndex, senderID(msg), matchIndexRPC(rpc(msg)))))
+                        (((findMaxAgreeIndex(# log, replace(matchIndex, senderID(msg), matchIndexRPC(rpc(msg)))) > 0) && 
+                            (getTerm(log, findMaxAgreeIndex(# log, replace(matchIndex, senderID(msg), matchIndexRPC(rpc(msg))))) == currentTerm) && 
+                            (commitIndex != findMaxAgreeIndex(# log, replace(matchIndex, senderID(msg), matchIndexRPC(rpc(msg))))))) -> advanceCommitIndex(commitIndex, findMaxAgreeIndex(# log, matchIndex), currentTerm, log) . Node(nextIndex = replace(nextIndex, senderID(msg), matchIndexRPC(rpc(msg))+1), matchIndex = replace(matchIndex, senderID(msg), matchIndexRPC(rpc(msg))), commitIndex = findMaxAgreeIndex(# log, replace(matchIndex, senderID(msg), matchIndexRPC(rpc(msg)))))
                         <>
                         % update nextIndex and matchIndex
                         Node(
@@ -596,7 +598,8 @@ proc Node(
                     <>
                     (
                         % update nextIndex, advance commit index
-                        ((findMaxAgreeIndex(# log, matchIndex) > 0) && (getTerm(log, findMaxAgreeIndex(# log, matchIndex)) == currentTerm) && (commitIndex != findMaxAgreeIndex(# log, matchIndex))) -> advanceCommitIndex(commitIndex, findMaxAgreeIndex(# log, matchIndex), currentTerm, log) . Node(nextIndex = replace(nextIndex, senderID(msg), max(1, (nextIndex . senderID(msg)) - 1)), commitIndex = findMaxAgreeIndex(# log, matchIndex)) 
+                        ((findMaxAgreeIndex(# log, matchIndex) > 0) && (getTerm(log, findMaxAgreeIndex(# log, matchIndex)) == currentTerm) && 
+                            (commitIndex != findMaxAgreeIndex(# log, matchIndex))) -> advanceCommitIndex(commitIndex, findMaxAgreeIndex(# log, matchIndex), currentTerm, log) . Node(nextIndex = replace(nextIndex, senderID(msg), max(1, (nextIndex . senderID(msg)) - 1)), commitIndex = findMaxAgreeIndex(# log, matchIndex)) 
                         <> % update nextIndex
                         Node(
                             nextIndex = replace(
