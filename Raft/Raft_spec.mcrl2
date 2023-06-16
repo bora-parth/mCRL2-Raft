@@ -645,12 +645,12 @@ proc Node(
         % expose the leader (for property verification)
         (currentState == Leader) -> (
             exposeLeader(id, currentTerm) . Node()
-            % +
-            %exposeLogLeader(currentTerm, log) . Node()
+            +
+            exposeLogLeader(currentTerm, log) . Node()
         )
-        % +
-        %% expose the log (for property verification)
-        % exposeLog(id, currentTerm, commitIndex, log) . Node()        
+        +
+        % expose the log (for property verification)
+        exposeLog(id, currentTerm, commitIndex, log) . Node()        
     
     )
     <>	
