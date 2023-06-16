@@ -660,28 +660,16 @@ proc Node(
 
 % healthy and reliable network which doesn't loose messages
 proc HealthyNetwork(messageCollection: List(NetworkPayload)) = 
-            % receive messages from server and add it
+            % receive messages from server
             (# messageCollection < NetworkSize) -> sum msg: NetworkPayload . (receiveFromServer(msg) . HealthyNetwork(messageCollection = add(messageCollection, msg)))
             +
-            % receive messages from server but don't add it
-            (# messageCollection < NetworkSize) -> sum msg: NetworkPayload . (receiveFromServer(msg) . HealthyNetwork())
-            +
-            % receive a set of messages from the server and add it
             (# messageCollection < NetworkSize - (NumberOfServers - 1)) -> sum msgSet: List(NetworkPayload) . (receiveFromServerSet(msgSet) . HealthyNetwork(messageCollection = addList(messageCollection, msgSet)))
             +
-            % receive a set of messages from the server but don't add it
-            (# messageCollection < NetworkSize - (NumberOfServers - 1)) -> sum msgSet: List(NetworkPayload) . (receiveFromServerSet(msgSet) . HealthyNetwork())
-            +
-        sum msg: NetworkPayload . (
-            (msg in messageCollection) -> (
-                    % send message to the server and remove it
+            sum msg: NetworkPayload . (
+                (msg in messageCollection) -> (
                     sendToServer(msg) . HealthyNetwork(messageCollection = remove(messageCollection, msg))
-                    % send message to the server but don't remove it
-                    + sendToServer(msg) . HealthyNetwork()
-            )
-        )
-
-            ;
+                )
+            );
 
 % client process
 proc Client(clientCommandID: Pos) = 
