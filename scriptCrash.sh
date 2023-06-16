@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the files
-files=("clientCommand.mcf"  "electionSafety.mcf" "electionSafetyLiveliness.mcf" "leaderCompleteness.mcf" "leaderCompletenessLiveliness.mcf" "logMatching.mcf" "logMatchingLiveliness.mcf" "stateMachineLiveliness.mcf" "stateMachineSafety.mcf")
+files=("clientCommand.mcf"  "electionSafety.mcf" "electionSafetyLiveliness.mcf" "leaderCompleteness.mcf" "leaderCompletenessLiveliness.mcf" "logMatching.mcf" "logMatchingLiveliness.mcf" "stateMachineLiveliness.mcf" "stateMachineSafety.mcf" "timeout.mcf")
 
 # Iterate over the files and create tmux sessions
 for file in "${files[@]}"; do
@@ -9,10 +9,10 @@ for file in "${files[@]}"; do
     
     # Open a new tmux session and run the commands
     tmux new-session -d -s "$session_name"
-    tmux send-keys -t "$session_name" 'export PATH=/scratch/mCRL2/202206.1/build/stage/bin/:$PATH' Enter
+    tmux send-keys -t "$session_name" 'export PATH=/scratch/mCRL2/master/build/stage/bin/:$PATH' Enter
     tmux send-keys -t "$session_name" 'cd /scratch/20201025' Enter
     tmux send-keys -t "$session_name" "lps2pbes -v raft.lps -f $file raft_$session_name.pbes" Enter
-    tmux send-keys -t "$session_name" "pbessolvesymbolic --cached --chaining --groups=simple -v -m200 --lace-workers=3 --timings=$session_name_timing.txt -rjittyc raft_$session_name.pbes" Enter
+    tmux send-keys -t "$session_name" "pbessolvesymbolic --cached --chaining --groups=simple -v -m200 --threads=5 --timings=timing_$session_name.txt -rjittyc raft_$session_name.pbes" Enter
 done
 
 # Attach to the first session
