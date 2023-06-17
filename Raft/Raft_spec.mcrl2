@@ -454,7 +454,7 @@ init allow( {sendRPC, receiveRPC, clientCommand, advanceCommitIndex, timeout, se
                          sendToServer | receiveFromNetwork -> receiveRPC,
                          sendToNetworkSet | receiveFromServerSet -> sendRPCset
                     },
-                         Client(1) || Node(id = 0, currentState = Follower, currentTerm = 0, log = [], commitIndex = 0,
+                         Client(NumberOfClientRequests) || Node(id = 0, currentState = Follower, currentTerm = 0, log = [], commitIndex = 0,
           votedFor = -1, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers), replyToBeSent = replyHelper(false, emptyMessage)) || Node(id = 1, currentState = Follower, currentTerm = 0, log = [], commitIndex = 0,
           votedFor = -1, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers), replyToBeSent = replyHelper(false, emptyMessage)) || Node(id = 2, currentState = Follower, currentTerm = 0, log = [], commitIndex = 0,
           votedFor = -1, voterLog = [], nextIndex = initArray(0, NumberOfServers), matchIndex = initArray(0, NumberOfServers), replyToBeSent = replyHelper(false, emptyMessage)) || HealthyNetwork(messageCollection = [])
