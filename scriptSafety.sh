@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Define the files
+files=("electionSafety.mcf" "leaderCompleteness.mcf"  "logMatching.mcf" "stateMachineSafety.mcf"  "timeout.mcf")
+
+# Iterate over the files and create tmux sessions
+for file in "${files[@]}"; do
+    session_name="${file%.*}" # Extract the session name without the file extension
+    
+    # Open a new tmux session and run the commands
+    tmux new-session -d -s "$session_name"
+    tmux send-keys -t "$session_name" 'export PATH=/scratch/mCRL2/master/build/stage/bin/:$PATH' Enter
+    tmux send-keys -t "$session_name" 'cd /scratch/20201025' Enter
+    tmux send-keys -t "$session_name" "lps2pbes -v raft.lps -f $file raft_$session_name.pbes" Enter
+    tmux send-keys -t "$session_name" "pbessolvesymbolic --cached --chaining --groups=simple -v -m100 --threads=4 --timings=timing_$session_name.txt -rjittyc -s2 raft_$session_name.pbes" Enter
+done
+
+# Attach to the first session
+tmux attach-session -t "${files[0]%.*}"
