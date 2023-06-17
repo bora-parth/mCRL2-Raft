@@ -687,7 +687,7 @@ init allow( {sendRPC, receiveRPC, clientCommand, advanceCommitIndex, timeout, se
                         sendToServer | receiveFromNetwork -> receiveRPC,
                         sendToNetworkSet | receiveFromServerSet -> sendRPCset
                     },
-                        Client(NumberOfClientRequests) || 
+                        Client(1) || 
                         Node(
                             id = 0, 
                             currentState = Follower, 
