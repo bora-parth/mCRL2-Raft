@@ -6,7 +6,7 @@ eqn NumberOfServers = 3;
 
 % max no. of client requests
 map NumberOfClientRequests: Pos;
-eqn NumberOfClientRequests = 1;
+eqn NumberOfClientRequests = 2;
 
 %max no. of terms
 map MaxTerm: Pos;
