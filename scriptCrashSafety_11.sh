@@ -2,6 +2,11 @@
 
 # Define the files
 files=("electionSafety.mcf" "leaderCompleteness.mcf" "logMatching.mcf" "stateMachineSafety.mcf")
+# Execute a command outside tmux sessions
+echo "Executing command outside tmux sessions"
+export PATH=/scratch/mCRL2/master/build/stage/bin/:$PATH
+cd /scratch/20201025
+mcrl22lps raft_spec_AC_11.mcrl2 raft_AC_11.lps
 
 # Iterate over the files and create tmux sessions
 for file in "${files[@]}"; do

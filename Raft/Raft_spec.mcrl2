@@ -6,11 +6,11 @@ eqn NumberOfServers = 3;
 
 % max no. of client requests
 map NumberOfClientRequests: Pos;
-eqn NumberOfClientRequests = 2;
+eqn NumberOfClientRequests = 1;
 
 %max no. of terms
 map MaxTerm: Pos;
-eqn MaxTerm = 2;
+eqn MaxTerm = 1;
 
 % no. of messages the server can hold
 map NetworkSize: Pos;
@@ -41,7 +41,7 @@ sort RPC = struct
 sort replyHelper = struct replyHelper(existMsg: Bool, reply: NetworkPayload);
 
 % entry (command) inside the log
-sort logEntry = struct Command(term: Nat);
+sort logEntry = struct Command(term: Nat, commandID: Nat);
 
 % log maitained on each node (list of commands)
 sort LogType = List(logEntry);       
@@ -245,7 +245,7 @@ act sendToNetwork, receiveFromServer, sendToServer, receiveFromNetwork, sendRPC,
 act sendToNetworkSet, receiveFromServerSet, sendRPCset: List(NetworkPayload);
 
 % actions for sending and receiving client requests
-act sendClientRequest, recvClientRequest, clientCommand;
+act sendClientRequest, recvClientRequest, clientCommand: Nat;
 
 % action for timing out and crashing and resuming
 act timeout, crash, resume;
@@ -631,7 +631,7 @@ proc Node(
         % leaders can receive client commands, send append entry requests 
         ((currentState == Leader) && !existMsg(replyToBeSent)) -> (
             % receive messages from clients
-            recvClientRequest . Node(log = log <| Command(currentTerm))
+            (sum clientCommandID: Nat . recvClientRequest(clientCommandID) . Node(log = log <| Command(currentTerm, clientCommandID)))
             +
             % send append entry requests or heartbeats to servers
             sendToNetworkSet(CreateAppendEntriesSet(id, nextIndex, currentTerm, log, commitIndex)) . Node()
@@ -676,7 +676,7 @@ proc HealthyNetwork(messageCollection: List(NetworkPayload)) =
 
 % client process
 proc Client(clientCommandID: Pos) = 
-     sum serverID: Nat . ((clientCommandID <= NumberOfClientRequests) -> sendClientRequest . Client(clientCommandID+1));
+     sum serverID: Nat . ((clientCommandID <= NumberOfClientRequests) -> sendClientRequest(clientCommandID) . Client(clientCommandID+1));
 
 % initial configuration
 init allow( {sendRPC, receiveRPC, clientCommand, advanceCommitIndex, timeout, sendRPCset, exposeLeader, exposeLog, exposeLogLeader, crash, resume},
