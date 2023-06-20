@@ -16,9 +16,6 @@ eqn MaxTerm = 2;
 map NetworkSize: Pos;
 eqn NetworkSize = 3;
 
-map BATCH_SIZE: Pos;
-eqn BATCH_SIZE = 1; 
-
 % no. that defines the majority within the cluster 
 % we don't model changes in cluster membership so this no. remains constant
 map MAJORITY: Pos;
@@ -41,7 +38,7 @@ sort RPC = struct
 sort replyHelper = struct replyHelper(existMsg: Bool, reply: NetworkPayload);
 
 % entry (command) inside the log
-sort logEntry = struct Command(term: Nat);
+sort logEntry = struct Command(term: Nat, commandID_: Nat);
 
 % log maitained on each node (list of commands)
 sort LogType = List(logEntry);       
@@ -245,7 +242,7 @@ act sendToNetwork, receiveFromServer, sendToServer, receiveFromNetwork, sendRPC,
 act sendToNetworkSet, receiveFromServerSet, sendRPCset: List(NetworkPayload);
 
 % actions for sending and receiving client requests
-act sendClientRequest, recvClientRequest, clientCommand;
+act sendClientRequest, recvClientRequest, clientCommand: Nat;
 
 % action for timing out and crashing and resuming
 act timeout, crash, resume;
@@ -628,7 +625,7 @@ proc Node(
         % leaders can receive client commands, send append entry requests 
         ((currentState == Leader) && !existMsg(replyToBeSent)) -> (
             % receive messages from clients
-            recvClientRequest . Node(log = log <| Command(currentTerm))
+            sum commandID: Nat . recvClientRequest(commandID) . Node(log = log <| Command(currentTerm, commandID))
             +
             % send append entry requests or heartbeats to servers
             sendToNetworkSet(CreateAppendEntriesSet(id, nextIndex, currentTerm, log, commitIndex)) . Node()
@@ -689,7 +686,7 @@ proc LossyDuplicateNetwork(messageCollection: List(NetworkPayload)) =
 
 % client process
 proc Client(clientCommandID: Pos) = 
-     sum serverID: Nat . ((clientCommandID <= NumberOfClientRequests) -> sendClientRequest . Client(clientCommandID+1));
+     sum serverID: Nat . ((clientCommandID <= NumberOfClientRequests) -> sendClientRequest(clientCommandID) . Client(clientCommandID+1));
 
 % initial configuration
 init allow( {sendRPC, receiveRPC, clientCommand, advanceCommitIndex, timeout, sendRPCset, exposeLeader, exposeLog, exposeLogLeader, crash, resume},
