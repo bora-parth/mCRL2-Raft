@@ -16,9 +16,6 @@ eqn MaxTerm = 1;
 map NetworkSize: Pos;
 eqn NetworkSize = 3;
 
-map BATCH_SIZE: Pos;
-eqn BATCH_SIZE = 1; 
-
 % no. that defines the majority within the cluster 
 % we don't model changes in cluster membership so this no. remains constant
 map MAJORITY: Pos;
@@ -662,15 +659,15 @@ proc Node(
     );
 
 % healthy and reliable network which doesn't loose messages
-proc HealthyNetwork(messageCollection: List(NetworkPayload)) = 
+proc Network(messageCollection: List(NetworkPayload)) = 
             % receive messages from server
-            (# messageCollection < NetworkSize) -> sum msg: NetworkPayload . (receiveFromServer(msg) . HealthyNetwork(messageCollection = add(messageCollection, msg)))
+            (# messageCollection < NetworkSize) -> sum msg: NetworkPayload . (receiveFromServer(msg) . Network(messageCollection = add(messageCollection, msg)))
             +
-            (# messageCollection < NetworkSize - (NumberOfServers - 1)) -> sum msgSet: List(NetworkPayload) . (receiveFromServerSet(msgSet) . HealthyNetwork(messageCollection = addList(messageCollection, msgSet)))
+            (# messageCollection < NetworkSize - (NumberOfServers - 1)) -> sum msgSet: List(NetworkPayload) . (receiveFromServerSet(msgSet) . Network(messageCollection = addList(messageCollection, msgSet)))
             +
             sum msg: NetworkPayload . (
                 (msg in messageCollection) -> (
-                    sendToServer(msg) . HealthyNetwork(messageCollection = remove(messageCollection, msg))
+                    sendToServer(msg) . Network(messageCollection = remove(messageCollection, msg))
                 )
             );
 
@@ -723,7 +720,7 @@ init allow( {sendRPC, receiveRPC, clientCommand, advanceCommitIndex, timeout, se
                             matchIndex = initArray(0, NumberOfServers), 
                             replyToBeSent = replyHelper(false, emptyMessage)
                         ) || 
-                        HealthyNetwork(messageCollection = [])
+                        Network(messageCollection = [])
                     )
 
 );
